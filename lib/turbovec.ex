@@ -5,6 +5,12 @@ defmodule TurboVec do
   The index handle is a node-local NIF resource: it cannot cross nodes,
   survive `:erlang.term_to_binary/1`, or live in ETS across restarts.
   Move an index between nodes or lifetimes with `write/2` and `load/1`.
+
+  In-memory vector binaries are native-endian f32; the on-disk `.tvim`
+  format is little-endian. Do not checksum one against the other.
+
+  After a NIF panic the recovered index may be half-mutated; a
+  subsequent `sync` persists that state.
   """
 
   import Bitwise
@@ -117,8 +123,9 @@ defmodule TurboVec do
   def bit_width(index), do: NIF.bit_width(index)
 
   @doc """
-  Full durable snapshot (atomic replace). `write` then `sync` on the
-  same path rebuilds (the snapshot is unclaimed, not foreign). Two
+  Full durable snapshot (atomic replace). Do not `write/2` to a path
+  another handle is incrementally syncing. `write` then `sync` on the
+  same handle rebuilds (the snapshot is unclaimed, not foreign). Two
   handles incrementally syncing one path is not supported — the lagging
   handle fails at its next `sync`.
   Holding the read lock: mutations queue for the duration, and once one

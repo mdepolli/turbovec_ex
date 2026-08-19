@@ -25,8 +25,7 @@ positional index is out of scope.
 
 ## Installation
 
-If [available in Hex](https://hex.pm/docs/publish), the package can be installed
-by adding `turbovec_ex` to your list of dependencies in `mix.exs`:
+Add `turbovec_ex` to your list of dependencies in `mix.exs`:
 
 ```elixir
 def deps do
@@ -36,9 +35,11 @@ def deps do
 end
 ```
 
-Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_doc)
-and published on [HexDocs](https://hexdocs.pm). Once published, the docs can
-be found at <https://hexdocs.pm/turbovec_ex>.
+The NIF is precompiled — no Rust toolchain needed. To compile from
+source, set `TURBOVEC_EX_BUILD=1` (requires Rust ≥ 1.89). 64-bit hosts
+only.
+
+Docs: <https://hexdocs.pm/turbovec_ex>.
 
 ## API
 
@@ -49,8 +50,9 @@ be found at <https://hexdocs.pm/turbovec_ex>.
 # results: [{id, score}, ...]  — length <= k, best first
 :ok = TurboVec.remove(idx, id)
 
-n = TurboVec.count(idx)
-d = TurboVec.dim(idx)
+count = TurboVec.count(idx)
+dim = TurboVec.dim(idx)
+bit_width = TurboVec.bit_width(idx)
 true = TurboVec.contains?(idx, id)
 
 :ok = TurboVec.write(idx, "/var/data/myapp/index.tvim")
@@ -79,13 +81,22 @@ cosine only when the vectors are L2-normalized.
 save to one path (first call to a fresh path writes the whole file).
 `load/1` reads both.
 
-Do not `write/2` to a path you `sync/2` to. `write` replaces the file as
-unclaimed while a live handle may still be bound to it; the next `sync`
-then fails. Two VMs syncing one path is not supported — the crate notices
-after the fact, it does not lock.
+Do not mix `write/2` and `sync/2` on one path as a routine workflow.
+A same-handle `write` then `sync` rebuilds (the snapshot is unclaimed,
+not foreign). Two handles incrementally syncing one path is not
+supported — the crate notices after the fact, it does not lock.
 
 On-disk `.tvim` is little-endian. In-memory vector binaries are native-endian.
 Do not checksum one against the other.
+
+## Tuning
+
+Crate work runs on a dedicated rayon pool (threads named `turbovec-*`),
+not the process-global pool. Size, first match wins:
+
+1. `TURBOVEC_NUM_THREADS`
+2. `RAYON_NUM_THREADS`
+3. `max(1, available_parallelism / 2)`
 
 ## Constraints we will not walk back
 

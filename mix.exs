@@ -56,7 +56,10 @@ defmodule TurboVec.MixProject do
 
   defp package do
     [
-      files: ~w(lib .formatter.exs mix.exs README.md LICENSE CHANGELOG.md),
+      # checksum-*.exs is generated after the first tagged release;
+      # Mix treats the unmatched glob as a missing file until then.
+      files:
+        ~w(lib native/turbovec_nif/src native/turbovec_nif/Cargo.toml native/turbovec_nif/Cargo.lock native/turbovec_nif/.cargo rust-toolchain.toml checksum-*.exs .formatter.exs mix.exs README.md LICENSE CHANGELOG.md),
       licenses: ["MIT"],
       links: %{"GitHub" => @source_url},
       maintainers: ["Marcelo De Polli"]
@@ -65,7 +68,7 @@ defmodule TurboVec.MixProject do
 
   defp docs do
     [
-      main: "readme",
+      main: "TurboVec",
       source_ref: "v#{@version}",
       source_url: @source_url,
       extras: [
