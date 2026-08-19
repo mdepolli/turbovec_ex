@@ -1,6 +1,8 @@
 defmodule TurboVecTest do
   use ExUnit.Case, async: true
 
+  @u64_max 18_446_744_073_709_551_615
+
   describe "new/1" do
     test "returns a handle" do
       {:ok, index} = TurboVec.new(dim: 8, bit_width: 4)
@@ -66,6 +68,57 @@ defmodule TurboVecTest do
       bin = f32_binary([List.duplicate(1.0, 8)])
 
       assert {:error, {:ids_count_mismatch, 1, 2}} = TurboVec.add(index, bin, [1, 2])
+    end
+
+    test "rejects an id already present and a duplicate in batch" do
+      {:ok, index} = TurboVec.new(dim: 8, bit_width: 4)
+      row = f32_binary([List.duplicate(1.0, 8)])
+      :ok = TurboVec.add(index, row, [7])
+
+      # error atomicity: the failed batch adds nothing
+      assert {:error, {:id_already_present, 7}} = TurboVec.add(index, row, [7])
+      two = f32_binary([List.duplicate(1.0, 8), List.duplicate(2.0, 8)])
+      assert {:error, {:duplicate_id_in_batch, 9}} = TurboVec.add(index, two, [9, 9])
+      assert TurboVec.count(index) == 1
+    end
+
+    test "rejects non-finite input with row and coordinate" do
+      {:ok, index} = TurboVec.new(dim: 8, bit_width: 4)
+      # NaN at row 0, coord 3 — value travels as a string (Erlang floats
+      # can't hold NaN)
+      nan = <<0, 0, 192, 127>>
+      bin = f32_binary([[1.0, 1.0, 1.0]]) <> nan <> f32_binary([[1.0, 1.0, 1.0, 1.0]])
+
+      assert {:error, {:invalid_input_value, 0, 3, value}} = TurboVec.add(index, bin, [1])
+      assert is_binary(value)
+    end
+
+    test "rejects ids outside u64 at the source" do
+      {:ok, index} = TurboVec.new(dim: 8, bit_width: 4)
+      bin = f32_binary([List.duplicate(1.0, 8)])
+
+      assert {:error, {:id_out_of_range, _}} = TurboVec.add(index, bin, [@u64_max + 1])
+      assert {:error, {:id_out_of_range, -1}} = TurboVec.add(index, bin, [-1])
+    end
+
+    test "raises ArgumentError for a non-integer id" do
+      {:ok, index} = TurboVec.new(dim: 8, bit_width: 4)
+      bin = f32_binary([List.duplicate(1.0, 8)])
+
+      # type errors raise; domain errors return tuples (spec).
+      # 1.5 AND 1.0 are type errors, not :id_out_of_range.
+      assert_raise ArgumentError, fn -> TurboVec.add(index, bin, [:seven]) end
+      assert_raise ArgumentError, fn -> TurboVec.add(index, bin, [1.5]) end
+      assert_raise ArgumentError, fn -> TurboVec.add(index, bin, [1.0]) end
+      # beyond i128, the id value cannot ride in the error tuple
+      assert_raise ArgumentError, fn -> TurboVec.add(index, bin, [Integer.pow(2, 200)]) end
+    end
+
+    test "raises ArgumentError for vectors that are neither binary nor tensor" do
+      {:ok, index} = TurboVec.new(dim: 8, bit_width: 4)
+
+      # lists of floats are not an API; fail loudly, not with a FunctionClauseError
+      assert_raise ArgumentError, fn -> TurboVec.add(index, [1.0, 2.0], [1]) end
     end
   end
 
