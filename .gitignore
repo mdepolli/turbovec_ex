@@ -1,0 +1,47 @@
+# The directory Mix will write compiled artifacts to.
+/_build/
+
+# If you run "mix test --cover", coverage assets end up here.
+/cover/
+
+# The directory Mix downloads your dependencies sources to.
+/deps/
+
+# Where third-party dependencies like ExDoc output generated docs.
+/doc/
+
+# Temporary files, for example, from tests.
+/tmp/
+
+# If the VM crashes, it generates a dump, let's ignore it too.
+erl_crash.dump
+
+# Also ignore archive artifacts (built via "mix archive.build").
+*.ez
+
+# Ignore package tarball (built via "mix hex.build").
+turbovec_ex-*.tar
+
+# Local git worktrees
+.worktrees/
+
+# Agent coding
+.claude/
+.grok/
+CLAUDE.md
+
+# Elixir LS
+/.expert/
+
+# macOS Finder metadata
+.DS_Store
+
+# Local environment files (API keys for the benchmark runners)
+.env
+.env.*
+.envrc
+mise.toml
+mise.local.toml
+
+# Generated analysis output
+xref_graph.dot
