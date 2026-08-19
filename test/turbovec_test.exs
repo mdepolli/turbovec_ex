@@ -191,6 +191,30 @@ defmodule TurboVecTest do
     test "raises ArgumentError for a query that is neither binary nor tensor", %{index: index} do
       assert_raise ArgumentError, fn -> TurboVec.search(index, [1.0, 2.0], k: 1) end
     end
+
+    test "allowlist restricts results and clamps k", %{index: index} do
+      {:ok, results} =
+        TurboVec.search(index, f32_binary([basis(0)]), k: 10, allowlist: [101, 103])
+
+      # only allowed ids, clamped to allowlist size (spec)
+      assert length(results) == 2
+      assert Enum.map(results, &elem(&1, 0)) |> Enum.sort() == [101, 103]
+    end
+
+    test "empty allowlist is an error, not zero results", %{index: index} do
+      # pass nil to search everything (upstream contract)
+      assert {:error, :allowlist_empty} =
+               TurboVec.search(index, f32_binary([basis(0)]), k: 1, allowlist: [])
+    end
+
+    test "unknown and out-of-range allowlist ids error", %{index: index} do
+      q = f32_binary([basis(0)])
+
+      assert {:error, {:unknown_id, 999}} = TurboVec.search(index, q, k: 1, allowlist: [999])
+
+      assert {:error, {:id_out_of_range, _}} =
+               TurboVec.search(index, q, k: 1, allowlist: [18_446_744_073_709_551_616])
+    end
   end
 
   describe "contains?/2" do
