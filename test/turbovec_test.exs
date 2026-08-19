@@ -42,6 +42,13 @@ defmodule TurboVecTest do
       assert :ok = TurboVec.add(index, vectors, [10, 20])
       assert TurboVec.count(index) == 2
     end
+
+    test "rejects a buffer that is not a whole number of rows" do
+      {:ok, index} = TurboVec.new(dim: 8, bit_width: 4)
+      # 9 floats over dim 8
+      bin = f32_binary([List.duplicate(1.0, 9)])
+      assert {:error, {:vector_buffer_size_mismatch, 9, 8}} = TurboVec.add(index, bin, [1])
+    end
   end
 
   describe "count/1" do
