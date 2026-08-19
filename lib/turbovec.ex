@@ -140,6 +140,8 @@ defmodule TurboVec do
   Durable incremental save. First call to a fresh path writes the whole
   file; the index stays bound to the path. One writer per path — a
   concurrent writer is detected at the *next* sync, not locked out.
+  Holds the write lock for the disk IO: searches and mutations queue
+  until it returns.
   """
   @spec sync(index(), Path.t()) :: :ok | {:error, term()}
   def sync(index, path), do: NIF.sync(index, IO.chardata_to_string(path))
