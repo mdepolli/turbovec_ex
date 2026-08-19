@@ -4,6 +4,8 @@ defmodule TurboVec.NIF do
 
   def new(_dim, _bit_width), do: err()
   def count(_index), do: err()
+  def bit_width(_index), do: err()
+  def dim(_index), do: err()
 
   defp err, do: :erlang.nif_error(:nif_not_loaded)
 end

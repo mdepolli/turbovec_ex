@@ -30,4 +30,16 @@ fn count(res: ResourceArc<IndexResource>) -> usize {
     read(&res).len()
 }
 
+#[rustler::nif(schedule = "DirtyCpu")]
+fn bit_width(res: ResourceArc<IndexResource>) -> usize {
+    read(&res).bit_width()
+}
+
+#[rustler::nif(schedule = "DirtyCpu")]
+fn dim(res: ResourceArc<IndexResource>) -> usize {
+    // dim_opt is always Some: new/1 requires dim and load/1 rejects lazy
+    // files (Task 8). Never call the deprecated dim() — 0-for-lazy footgun.
+    read(&res).dim_opt().expect("index is always dim-committed")
+}
+
 rustler::init!("Elixir.TurboVec.NIF");
