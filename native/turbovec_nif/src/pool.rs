@@ -12,7 +12,7 @@ pub fn pool_size(
 ) -> usize {
     std::cmp::max(
         1,
-        turbovec_env.or(rayon_env).unwrap_or_else(|| fallback_n / 2),
+        turbovec_env.or(rayon_env).unwrap_or(fallback_n / 2),
     )
 }
 

@@ -83,7 +83,7 @@ fn add(
     vectors: Binary,
     ids: Vec<Term>,
 ) -> NifResult<rustler::Atom> {
-    if vectors.len() % 4 != 0 {
+    if !vectors.len().is_multiple_of(4) {
         return Err(Error::Term(Box::new((
             error::atoms::vector_byte_size_mismatch(),
             vectors.len(),
@@ -92,7 +92,7 @@ fn add(
     let ids = decode_ids(ids)?;
     let vecs = f32s(&vectors);
     let mut guard = write(&res);
-    let idx: &mut IdMapIndex = &mut *guard;
+    let idx: &mut IdMapIndex = &mut guard;
     pool::get()
         .install(|| idx.add_with_ids(&vecs, &ids))
         .map_err(error::add)?;
@@ -103,7 +103,7 @@ fn add(
 fn remove(res: ResourceArc<IndexResource>, id: Term) -> NifResult<rustler::Atom> {
     let id = decode_ids(vec![id])?[0];
     let mut guard = write(&res);
-    let idx: &mut IdMapIndex = &mut *guard;
+    let idx: &mut IdMapIndex = &mut guard;
     if pool::get().install(|| idx.remove(id)) {
         Ok(error::atoms::ok())
     } else {
@@ -162,7 +162,7 @@ fn write_index(res: ResourceArc<IndexResource>, path: String) -> NifResult<rustl
 #[rustler::nif(schedule = "DirtyIo")]
 fn sync(res: ResourceArc<IndexResource>, path: String) -> NifResult<rustler::Atom> {
     let mut guard = write(&res);
-    let idx: &mut IdMapIndex = &mut *guard;
+    let idx: &mut IdMapIndex = &mut guard;
     pool::get().install(|| idx.sync(&path)).map_err(error::io)?;
     Ok(error::atoms::ok())
 }
