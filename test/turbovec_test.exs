@@ -2,6 +2,7 @@ defmodule TurboVecTest do
   use ExUnit.Case, async: true
 
   @u64_max 18_446_744_073_709_551_615
+  @dim 64
 
   describe "new/1" do
     test "returns a handle" do
@@ -277,6 +278,50 @@ defmodule TurboVecTest do
       assert {:error, {:invalid_tensor_shape, {2, 8}, 8}} = TurboVec.search(index, two_row, k: 1)
       assert {:error, {:invalid_tensor_shape, {16}, 8}} = TurboVec.search(index, wrong_dim, k: 1)
     end
+
+    @tag :recall
+    test "quantized top-10 overlaps exact inner-product top-10" do
+      vectors = random_vectors(300, 42)
+      {:ok, index} = TurboVec.new(dim: @dim, bit_width: 4)
+      :ok = TurboVec.add(index, f32_binary(vectors), Enum.to_list(1..300))
+      queries = random_vectors(20, 7)
+
+      recalls =
+        for query <- queries do
+          exact =
+            vectors
+            |> Enum.with_index(1)
+            |> Enum.sort_by(fn {vector, _id} -> -inner_product(query, vector) end)
+            |> Enum.take(10)
+            |> MapSet.new(fn {_vector, id} -> id end)
+
+          {:ok, results} = TurboVec.search(index, f32_binary([query]), k: 10)
+          got = MapSet.new(results, fn {id, _score} -> id end)
+          MapSet.intersection(exact, got) |> MapSet.size()
+        end
+
+      # a plumbing bug (wrong stride, endianness, transposition) lands
+      # near 0; quantization alone stays well above this floor.
+      assert Enum.sum(recalls) / (20 * 10) > 0.5
+    end
+
+    @tag :tripwire
+    test "runs on turbovec-* threads, never the global rayon pool" do
+      if File.dir?("/proc/self/task") do
+        {:ok, index} = TurboVec.new(dim: @dim)
+        :ok = TurboVec.add(index, f32_binary(random_vectors(100, 3)), Enum.to_list(1..100))
+        {:ok, _} = TurboVec.search(index, f32_binary(random_vectors(1, 4)), k: 5)
+
+        names =
+          Path.wildcard("/proc/self/task/*/comm")
+          |> Enum.map(fn path -> path |> File.read!() |> String.trim() end)
+
+        refute Enum.any?(names, &String.starts_with?(&1, "rayon")),
+               "global rayon pool threads exist: #{inspect(names)}"
+
+        assert Enum.any?(names, &String.starts_with?(&1, "turbovec-"))
+      end
+    end
   end
 
   describe "contains?/2" do
@@ -334,6 +379,39 @@ defmodule TurboVecTest do
       :ok = TurboVec.write(index, path)
 
       assert :ok = TurboVec.sync(index, path)
+    end
+
+    @tag :concurrency
+    @tag timeout: 120_000
+    test "searches and a mutation complete during a long write" do
+      {:ok, index} = TurboVec.new(dim: @dim, bit_width: 4)
+      vectors = random_vectors(5_000, 1)
+      :ok = TurboVec.add(index, f32_binary(vectors), Enum.to_list(1..5_000))
+      dir = System.tmp_dir!() |> Path.join("turbovec_conc_#{System.unique_integer([:positive])}")
+      File.mkdir_p!(dir)
+      query = f32_binary([hd(vectors)])
+
+      write_task = Task.async(fn -> TurboVec.write(index, Path.join(dir, "a.tvim")) end)
+
+      add_task =
+        Task.async(fn ->
+          TurboVec.add(index, f32_binary(random_vectors(10, 2)), Enum.to_list(9_001..9_010))
+        end)
+
+      search_results =
+        for _ <- 1..20 do
+          {micros, {:ok, results}} = :timer.tc(fn -> TurboVec.search(index, query, k: 5) end)
+          {micros, results}
+        end
+
+      # everything completes and stays correct; latency is reported, not
+      # asserted (CI timing is not a contract)
+      assert :ok = Task.await(write_task, 60_000)
+      assert :ok = Task.await(add_task, 60_000)
+      assert Enum.all?(search_results, fn {_micros, results} -> length(results) == 5 end)
+      max_micros = search_results |> Enum.map(&elem(&1, 0)) |> Enum.max()
+      IO.puts("max search latency during write+add: #{max_micros}µs")
+      File.rm_rf!(dir)
     end
   end
 
@@ -399,4 +477,17 @@ defmodule TurboVecTest do
   end
 
   defp basis(i), do: for(j <- 0..7, do: if(j == i, do: 1.0, else: 0.0))
+
+  defp random_vectors(n, seed) do
+    :rand.seed(:exsss, {seed, seed, seed})
+    # Round through f32 so the oracle sees exactly what the index sees.
+    for _ <- 1..n do
+      row = for _ <- 1..@dim, do: :rand.uniform() * 4 - 2
+      for <<x::float-32-native <- f32_binary([row])>>, do: x
+    end
+  end
+
+  defp inner_product(left, right) do
+    Enum.zip_reduce(left, right, 0.0, fn x, y, acc -> acc + x * y end)
+  end
 end
