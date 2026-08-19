@@ -47,4 +47,19 @@ defmodule TurboVecTest do
       assert TurboVec.bit_width(index) == 4
     end
   end
+
+  describe "add/3" do
+    test "adds vectors and counts them" do
+      {:ok, index} = TurboVec.new(dim: 8, bit_width: 4)
+      vectors = f32_binary([[1, 0, 0, 0, 0, 0, 0, 0], [0, 1, 0, 0, 0, 0, 0, 0]])
+
+      assert :ok = TurboVec.add(index, vectors, [10, 20])
+      assert TurboVec.count(index) == 2
+    end
+  end
+
+  defp f32_binary(rows) do
+    for row <- rows, x <- row, into: <<>>, do: <<x::float-32-native>>
+  end
 end
+

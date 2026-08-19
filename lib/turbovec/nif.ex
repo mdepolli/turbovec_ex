@@ -6,6 +6,7 @@ defmodule TurboVec.NIF do
   def count(_index), do: err()
   def bit_width(_index), do: err()
   def dim(_index), do: err()
+  def add(_index, _vectors, _ids), do: err()
 
   defp err, do: :erlang.nif_error(:nif_not_loaded)
 end

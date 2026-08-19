@@ -11,6 +11,9 @@ defmodule TurboVec do
 
   @type index :: reference()
 
+  @typedoc "A native-endian f32 binary, or (with Nx) an `Nx.Tensor` of type {:f, 32}."
+  @type vector_input :: binary() | struct()
+
   @doc """
   Creates an index. `dim` is required (positive multiple of 8, ≤ 16384);
   `bit_width` is 2, 3, or 4 (default 4).
@@ -37,4 +40,16 @@ defmodule TurboVec do
   @doc "Bits per coordinate (2, 3, or 4). Infallible."
   @spec bit_width(index()) :: 2 | 3 | 4
   def bit_width(index), do: NIF.bit_width(index)
+
+  @doc """
+  Adds vectors with stable u64 ids. Error atomicity: a rejected batch
+  leaves the index exactly as it was — no cleanup needed.
+  """
+  @spec add(index(), vector_input(), [non_neg_integer()]) :: :ok | {:error, term()}
+  def add(index, vectors, ids) when is_binary(vectors), do: NIF.add(index, vectors, ids)
+
+  def add(_index, vectors, _ids) do
+    raise ArgumentError,
+          "vectors must be a native-endian f32 binary or an Nx.Tensor, got: #{inspect(vectors)}"
+  end
 end
