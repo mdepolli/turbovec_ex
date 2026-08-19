@@ -47,7 +47,7 @@ defmodule TurboVec.MixProject do
 
   defp package do
     [
-      files: ~w(lib .formatter.exs mix.exs README.md LICENSE),
+      files: ~w(lib .formatter.exs mix.exs README.md LICENSE CHANGELOG.md),
       licenses: ["MIT"],
       links: %{"GitHub" => @source_url},
       maintainers: ["Marcelo De Polli"]
@@ -60,7 +60,8 @@ defmodule TurboVec.MixProject do
       source_ref: "v#{@version}",
       source_url: @source_url,
       extras: [
-        "README.md"
+        "README.md",
+        "CHANGELOG.md"
       ]
     ]
   end
