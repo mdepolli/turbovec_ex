@@ -4,11 +4,13 @@ defmodule TurboVecTest do
   describe "new/1" do
     test "returns a handle" do
       {:ok, index} = TurboVec.new(dim: 8, bit_width: 4)
+
       assert is_reference(index)
     end
 
     test "accepts bit_width 2, 3, and 4" do
       # 3 is deliberately supported (spec)
+
       for bw <- [2, 3, 4] do
         assert {:ok, _} = TurboVec.new(dim: 8, bit_width: bw)
       end
@@ -29,6 +31,7 @@ defmodule TurboVecTest do
       # dim and bit_width are usize at the NIF boundary, so negatives fail
       # term decode and raise like any type error. (The id policy's
       # out-of-range tuples apply to ids only.)
+
       assert_raise ArgumentError, fn -> TurboVec.new(dim: -8) end
       assert_raise ArgumentError, fn -> TurboVec.new(dim: 8, bit_width: -1) end
     end
@@ -47,6 +50,7 @@ defmodule TurboVecTest do
       {:ok, index} = TurboVec.new(dim: 8, bit_width: 4)
       # 9 floats over dim 8
       bin = f32_binary([List.duplicate(1.0, 9)])
+
       assert {:error, {:vector_buffer_size_mismatch, 9, 8}} = TurboVec.add(index, bin, [1])
     end
   end
@@ -54,6 +58,7 @@ defmodule TurboVecTest do
   describe "count/1" do
     test "starts at zero" do
       {:ok, index} = TurboVec.new(dim: 8, bit_width: 4)
+
       assert TurboVec.count(index) == 0
     end
   end
@@ -61,6 +66,7 @@ defmodule TurboVecTest do
   describe "bit_width/1" do
     test "defaults to 4" do
       {:ok, index} = TurboVec.new(dim: 8)
+
       assert TurboVec.bit_width(index) == 4
     end
   end
