@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `TURBOVEC_EX_BUILD=1` to compile from source (Rust ≥ 1.89, 64-bit).
 - Dedicated rayon pool sized by `TURBOVEC_NUM_THREADS`, then
   `RAYON_NUM_THREADS`, then `max(1, available_parallelism / 2)`.
+- Elixir `~> 1.17` (Nx's floor; CI covers 1.17–1.20).
 
 [Unreleased]: https://github.com/mdepolli/turbovec_ex/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/mdepolli/turbovec_ex/releases/tag/v0.1.0

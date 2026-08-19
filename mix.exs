@@ -8,7 +8,7 @@ defmodule TurboVec.MixProject do
     [
       app: :turbovec_ex,
       version: @version,
-      elixir: "~> 1.20",
+      elixir: "~> 1.17",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       description: description(),
