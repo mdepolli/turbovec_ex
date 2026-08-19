@@ -36,6 +36,19 @@ defmodule TurboVec do
   end
 
   @doc """
+  Loads a `write/2` snapshot or a `sync/2` container. Corruption and
+  foreign-writer conflicts both surface as `{:io_error, :invalid_data, msg}`
+  — distinguishable only by message (upstream limitation).
+  """
+  @spec load(Path.t()) :: {:ok, index()} | {:error, term()}
+  def load(path) do
+    case NIF.load(IO.chardata_to_string(path)) do
+      {:error, _} = error -> error
+      index -> {:ok, index}
+    end
+  end
+
+  @doc """
   Adds vectors with stable u64 ids. Error atomicity: a rejected batch
   leaves the index exactly as it was — no cleanup needed.
   """
@@ -102,6 +115,27 @@ defmodule TurboVec do
   @doc "Bits per coordinate (2, 3, or 4). Infallible."
   @spec bit_width(index()) :: 2 | 3 | 4
   def bit_width(index), do: NIF.bit_width(index)
+
+  @doc """
+  Full durable snapshot (atomic replace). `write` then `sync` on the
+  same path rebuilds (the snapshot is unclaimed, not foreign). Two
+  handles incrementally syncing one path is not supported — the lagging
+  handle fails at its next `sync`.
+  Holding the read lock: mutations queue for the duration, and once one
+  queues, new searches may block behind it (no RwLock fairness is
+  guaranteed). Prefer `sync/2` for routine durability; call `write/2`
+  in quiet periods.
+  """
+  @spec write(index(), Path.t()) :: :ok | {:error, term()}
+  def write(index, path), do: NIF.write_index(index, IO.chardata_to_string(path))
+
+  @doc """
+  Durable incremental save. First call to a fresh path writes the whole
+  file; the index stays bound to the path. One writer per path — a
+  concurrent writer is detected at the *next* sync, not locked out.
+  """
+  @spec sync(index(), Path.t()) :: :ok | {:error, term()}
+  def sync(index, path), do: NIF.sync(index, IO.chardata_to_string(path))
 
   defp query_binary(query, _index) when is_binary(query), do: {:ok, query}
 

@@ -22,6 +22,11 @@ pub mod atoms {
         query_size_mismatch,
         not_found,
         uncommitted_dim,
+        io_error,
+        permission_denied,
+        invalid_data,
+        already_exists,
+        other,
         turbovec_error,
     }
 }
@@ -92,4 +97,16 @@ pub fn search(e: SearchError) -> Error {
         ))),
         other => Error::Term(Box::new((atoms::turbovec_error(), other.to_string()))),
     }
+}
+
+pub fn io(e: std::io::Error) -> Error {
+    use std::io::ErrorKind::*;
+    let kind = match e.kind() {
+        NotFound => atoms::not_found(),
+        PermissionDenied => atoms::permission_denied(),
+        InvalidData => atoms::invalid_data(),
+        AlreadyExists => atoms::already_exists(),
+        _ => atoms::other(),
+    };
+    Error::Term(Box::new((atoms::io_error(), kind, e.to_string())))
 }

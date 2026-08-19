@@ -311,6 +311,89 @@ defmodule TurboVecTest do
     end
   end
 
+  describe "write/2" do
+    @describetag :tmp_dir
+
+    test "round-trip with load/1 preserves geometry and content", %{tmp_dir: dir} do
+      path = Path.join(dir, "index.tvim")
+      :ok = TurboVec.write(filled(), path)
+      {:ok, loaded} = TurboVec.load(path)
+
+      assert TurboVec.count(loaded) == 1
+      assert TurboVec.dim(loaded) == 8
+      assert TurboVec.bit_width(loaded) == 4
+      assert TurboVec.contains?(loaded, 42)
+    end
+
+    test "does not brick a later sync to the same path", %{tmp_dir: dir} do
+      # 1.0.0 treats write's UNCLAIMED snapshot as Replaced, not Foreign,
+      # so sync -> write -> sync rebuilds instead of getting stuck.
+      path = Path.join(dir, "bound.tvim")
+      index = filled()
+      :ok = TurboVec.sync(index, path)
+      :ok = TurboVec.write(index, path)
+
+      assert :ok = TurboVec.sync(index, path)
+    end
+  end
+
+  describe "sync/2" do
+    @describetag :tmp_dir
+
+    test "is incremental across calls", %{tmp_dir: dir} do
+      path = Path.join(dir, "inc.tvim")
+      index = filled()
+      :ok = TurboVec.sync(index, path)
+      :ok = TurboVec.add(index, f32_binary([List.duplicate(2.0, 8)]), [43])
+      :ok = TurboVec.sync(index, path)
+      {:ok, loaded} = TurboVec.load(path)
+
+      assert TurboVec.count(loaded) == 2
+    end
+
+    test "a second live handle notices a foreign incremental sync", %{tmp_dir: dir} do
+      path = Path.join(dir, "shared.tvim")
+      :ok = TurboVec.sync(filled(), path)
+      {:ok, first} = TurboVec.load(path)
+      {:ok, second} = TurboVec.load(path)
+      :ok = TurboVec.add(first, f32_binary([List.duplicate(2.0, 8)]), [43])
+      :ok = TurboVec.sync(first, path)
+
+      assert {:error, {:io_error, :invalid_data, _msg}} = TurboVec.sync(second, path)
+    end
+  end
+
+  describe "load/1" do
+    @describetag :tmp_dir
+
+    test "reads a sync container too", %{tmp_dir: dir} do
+      # first sync to a fresh path is a full write (spec)
+      path = Path.join(dir, "synced.tvim")
+      :ok = TurboVec.sync(filled(), path)
+
+      assert {:ok, loaded} = TurboVec.load(path)
+      assert TurboVec.count(loaded) == 1
+    end
+
+    test "missing file and wrong-magic file map to io_error", %{tmp_dir: dir} do
+      garbage = Path.join(dir, "garbage.tvim")
+      File.write!(garbage, "not a tvim file at all")
+
+      assert {:error, {:io_error, :not_found, _}} = TurboVec.load(Path.join(dir, "absent.tvim"))
+      assert {:error, {:io_error, :invalid_data, _}} = TurboVec.load(garbage)
+    end
+
+    test "a lazy uncommitted file is rejected — the add panic stays unreachable" do
+      assert {:error, :uncommitted_dim} = TurboVec.load("test/fixtures/lazy.tvim")
+    end
+  end
+
+  defp filled do
+    {:ok, index} = TurboVec.new(dim: 8)
+    :ok = TurboVec.add(index, f32_binary([List.duplicate(1.0, 8)]), [42])
+    index
+  end
+
   defp f32_binary(rows) do
     for row <- rows, x <- row, into: <<>>, do: <<x::float-32-native>>
   end

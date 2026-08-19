@@ -143,4 +143,26 @@ fn contains(res: ResourceArc<IndexResource>, id: u64) -> bool {
     read(&res).contains(id)
 }
 
+#[rustler::nif(schedule = "DirtyIo")]
+fn write_index(res: ResourceArc<IndexResource>, path: String) -> NifResult<rustler::Atom> {
+    read(&res).write(&path).map_err(error::io)?;
+    Ok(error::atoms::ok())
+}
+
+#[rustler::nif(schedule = "DirtyIo")]
+fn sync(res: ResourceArc<IndexResource>, path: String) -> NifResult<rustler::Atom> {
+    write(&res).sync(&path).map_err(error::io)?;
+    Ok(error::atoms::ok())
+}
+
+#[rustler::nif(schedule = "DirtyIo")]
+fn load(path: String) -> NifResult<ResourceArc<IndexResource>> {
+    let idx = IdMapIndex::load(&path).map_err(error::io)?;
+    if idx.dim_opt().is_none() {
+        // Spec: reject lazy loads so add_with_ids' documented panic is unreachable
+        return Err(Error::Term(Box::new(error::atoms::uncommitted_dim())));
+    }
+    Ok(ResourceArc::new(IndexResource(RwLock::new(idx))))
+}
+
 rustler::init!("Elixir.TurboVec.NIF");
