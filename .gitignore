@@ -1,6 +1,10 @@
 # The directory Mix will write compiled artifacts to.
 /_build/
 
+# Rust NIF crate build output. Do not ignore Cargo.lock — source builds
+# and rustler_precompiled checksums need a pinned crate graph.
+/native/turbovec_nif/target/
+
 # If you run "mix test --cover", coverage assets end up here.
 /cover/
 

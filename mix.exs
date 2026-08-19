@@ -31,11 +31,19 @@ defmodule TurboVec.MixProject do
 
   defp deps do
     [
+      # NIF
+      {:rustler, "~> 0.36"},
+
       # Dev/Test
       {:ex_doc, "~> 0.40", only: :dev, runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:mix_audit, "~> 2.1", only: [:dev, :test], runtime: false}
-    ]
+    ] ++ nx_dep()
+  end
+
+  # NO_NX=1 excludes Nx so CI can prove the library compiles without it.
+  defp nx_dep do
+    if System.get_env("NO_NX"), do: [], else: [{:nx, "~> 0.9", optional: true}]
   end
 
   defp description do
