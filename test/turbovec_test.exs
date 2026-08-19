@@ -34,6 +34,16 @@ defmodule TurboVecTest do
     end
   end
 
+  describe "add/3" do
+    test "adds vectors and counts them" do
+      {:ok, index} = TurboVec.new(dim: 8, bit_width: 4)
+      vectors = f32_binary([[1, 0, 0, 0, 0, 0, 0, 0], [0, 1, 0, 0, 0, 0, 0, 0]])
+
+      assert :ok = TurboVec.add(index, vectors, [10, 20])
+      assert TurboVec.count(index) == 2
+    end
+  end
+
   describe "count/1" do
     test "starts at zero" do
       {:ok, index} = TurboVec.new(dim: 8, bit_width: 4)
@@ -45,16 +55,6 @@ defmodule TurboVecTest do
     test "defaults to 4" do
       {:ok, index} = TurboVec.new(dim: 8)
       assert TurboVec.bit_width(index) == 4
-    end
-  end
-
-  describe "add/3" do
-    test "adds vectors and counts them" do
-      {:ok, index} = TurboVec.new(dim: 8, bit_width: 4)
-      vectors = f32_binary([[1, 0, 0, 0, 0, 0, 0, 0], [0, 1, 0, 0, 0, 0, 0, 0]])
-
-      assert :ok = TurboVec.add(index, vectors, [10, 20])
-      assert TurboVec.count(index) == 2
     end
   end
 

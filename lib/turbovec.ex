@@ -29,18 +29,6 @@ defmodule TurboVec do
     end
   end
 
-  @doc "Number of vectors in the index. Infallible."
-  @spec count(index()) :: non_neg_integer()
-  def count(index), do: NIF.count(index)
-
-  @doc "Vector dimensionality. Infallible; always committed."
-  @spec dim(index()) :: pos_integer()
-  def dim(index), do: NIF.dim(index)
-
-  @doc "Bits per coordinate (2, 3, or 4). Infallible."
-  @spec bit_width(index()) :: 2 | 3 | 4
-  def bit_width(index), do: NIF.bit_width(index)
-
   @doc """
   Adds vectors with stable u64 ids. Error atomicity: a rejected batch
   leaves the index exactly as it was — no cleanup needed.
@@ -52,4 +40,16 @@ defmodule TurboVec do
     raise ArgumentError,
           "vectors must be a native-endian f32 binary or an Nx.Tensor, got: #{inspect(vectors)}"
   end
+
+  @doc "Number of vectors in the index. Infallible."
+  @spec count(index()) :: non_neg_integer()
+  def count(index), do: NIF.count(index)
+
+  @doc "Vector dimensionality. Infallible; always committed."
+  @spec dim(index()) :: pos_integer()
+  def dim(index), do: NIF.dim(index)
+
+  @doc "Bits per coordinate (2, 3, or 4). Infallible."
+  @spec bit_width(index()) :: 2 | 3 | 4
+  def bit_width(index), do: NIF.bit_width(index)
 end
