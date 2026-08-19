@@ -7,7 +7,11 @@ defmodule TurboVec do
   Move an index between nodes or lifetimes with `write/2` and `load/1`.
   """
 
+  import Bitwise
+
   alias TurboVec.NIF
+
+  @u64_max (1 <<< 64) - 1
 
   @type index :: reference()
 
@@ -41,6 +45,10 @@ defmodule TurboVec do
           "vectors must be a native-endian f32 binary or an Nx.Tensor, got: #{inspect(vectors)}"
   end
 
+  @doc "Removes one id. `{:error, :not_found}` if absent."
+  @spec remove(index(), non_neg_integer()) :: :ok | {:error, term()}
+  def remove(index, id), do: NIF.remove(index, id)
+
   @doc """
   Top-k search. Returns up to `k` results — `k` is clamped to the index
   (and allowlist) size, so `length(results) <= k`; an empty index returns
@@ -60,6 +68,20 @@ defmodule TurboVec do
       end
     end
   end
+
+  @doc """
+  Whether `id` is in the index. Bare boolean — the one deliberate break
+  from ok/error tuples. An integer outside u64 returns `false`: it cannot
+  be present. The first id lookup after `load/1` builds the id map, O(n).
+  """
+  @spec contains?(index(), integer()) :: boolean()
+  def contains?(index, id) when is_integer(id) and id >= 0 and id <= @u64_max,
+    do: NIF.contains(index, id)
+
+  def contains?(_index, id) when is_integer(id), do: false
+
+  def contains?(_index, id),
+    do: raise(ArgumentError, "id must be an integer, got: #{inspect(id)}")
 
   @doc "Number of vectors in the index. Infallible."
   @spec count(index()) :: non_neg_integer()

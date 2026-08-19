@@ -122,6 +122,21 @@ defmodule TurboVecTest do
     end
   end
 
+  describe "remove/2" do
+    setup do
+      {:ok, index} = TurboVec.new(dim: 8)
+      :ok = TurboVec.add(index, f32_binary([List.duplicate(1.0, 8)]), [42])
+      %{index: index}
+    end
+
+    test "removes present ids and reports absent ones", %{index: index} do
+      assert :ok = TurboVec.remove(index, 42)
+      assert TurboVec.count(index) == 0
+      assert {:error, :not_found} = TurboVec.remove(index, 42)
+      assert {:error, {:id_out_of_range, _}} = TurboVec.remove(index, @u64_max + 1)
+    end
+  end
+
   describe "search/3" do
     setup do
       {:ok, index} = TurboVec.new(dim: 8, bit_width: 4)
@@ -175,6 +190,22 @@ defmodule TurboVecTest do
 
     test "raises ArgumentError for a query that is neither binary nor tensor", %{index: index} do
       assert_raise ArgumentError, fn -> TurboVec.search(index, [1.0, 2.0], k: 1) end
+    end
+  end
+
+  describe "contains?/2" do
+    setup do
+      {:ok, index} = TurboVec.new(dim: 8)
+      :ok = TurboVec.add(index, f32_binary([List.duplicate(1.0, 8)]), [42])
+      %{index: index}
+    end
+
+    test "is a bare predicate", %{index: index} do
+      # out-of-range id is false, not an error (spec deviation)
+      assert TurboVec.contains?(index, 42)
+      refute TurboVec.contains?(index, 43)
+      refute TurboVec.contains?(index, @u64_max + 1)
+      assert_raise ArgumentError, fn -> TurboVec.contains?(index, :nope) end
     end
   end
 

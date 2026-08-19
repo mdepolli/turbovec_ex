@@ -4,7 +4,9 @@ defmodule TurboVec.NIF do
 
   def new(_dim, _bit_width), do: err()
   def add(_index, _vectors, _ids), do: err()
+  def remove(_index, _id), do: err()
   def search(_index, _query, _k, _allowlist), do: err()
+  def contains(_index, _id), do: err()
   def count(_index), do: err()
   def dim(_index), do: err()
   def bit_width(_index), do: err()

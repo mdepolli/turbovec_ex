@@ -96,6 +96,16 @@ fn add(
 }
 
 #[rustler::nif(schedule = "DirtyCpu")]
+fn remove(res: ResourceArc<IndexResource>, id: Term) -> NifResult<rustler::Atom> {
+    let id = decode_ids(vec![id])?[0];
+    if write(&res).remove(id) {
+        Ok(error::atoms::ok())
+    } else {
+        Err(Error::Term(Box::new(error::atoms::not_found())))
+    }
+}
+
+#[rustler::nif(schedule = "DirtyCpu")]
 fn search(
     res: ResourceArc<IndexResource>,
     query: Binary,
@@ -126,6 +136,11 @@ fn search(
         .copied()
         .zip(results.scores_for_query(0).iter().copied())
         .collect())
+}
+
+#[rustler::nif(schedule = "DirtyCpu")]
+fn contains(res: ResourceArc<IndexResource>, id: u64) -> bool {
+    read(&res).contains(id)
 }
 
 rustler::init!("Elixir.TurboVec.NIF");
