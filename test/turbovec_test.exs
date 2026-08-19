@@ -38,6 +38,11 @@ defmodule TurboVecTest do
   end
 
   describe "add/3" do
+    setup do
+      {:ok, index} = TurboVec.new(dim: 8, bit_width: 4)
+      %{index: index}
+    end
+
     test "adds vectors and counts them" do
       {:ok, index} = TurboVec.new(dim: 8, bit_width: 4)
       vectors = f32_binary([[1, 0, 0, 0, 0, 0, 0, 0], [0, 1, 0, 0, 0, 0, 0, 0]])
@@ -120,6 +125,28 @@ defmodule TurboVecTest do
       # lists of floats are not an API; fail loudly, not with a FunctionClauseError
       assert_raise ArgumentError, fn -> TurboVec.add(index, [1.0, 2.0], [1]) end
     end
+
+    @tag :nx
+    test "adds an {n, dim} f32 tensor", %{index: index} do
+      tensor = Nx.eye(8, type: {:f, 32})
+
+      assert :ok = TurboVec.add(index, tensor, Enum.to_list(1..8))
+      assert TurboVec.count(index) == 8
+    end
+
+    @tag :nx
+    test "rejects non-f32 add tensors — byte size alone would misread f64", %{index: index} do
+      tensor = Nx.broadcast(Nx.tensor(1.0, type: {:f, 64}), {2, 8})
+
+      assert {:error, {:invalid_tensor_type, {:f, 64}}} = TurboVec.add(index, tensor, [1, 2])
+    end
+
+    @tag :nx
+    test "rejects a transposed add tensor — same bytes, scrambled rows", %{index: index} do
+      tensor = Nx.broadcast(Nx.tensor(1.0, type: {:f, 32}), {8, 2})
+
+      assert {:error, {:invalid_tensor_shape, {8, 2}, 8}} = TurboVec.add(index, tensor, [1, 2])
+    end
   end
 
   describe "remove/2" do
@@ -181,10 +208,10 @@ defmodule TurboVecTest do
 
     test "non-finite query coordinates are rejected", %{index: index} do
       # NaN at coord 5
-      q =
+      query =
         f32_binary([[1.0, 0.0, 0.0, 0.0, 0.0]]) <> <<0, 0, 192, 127>> <> f32_binary([[0.0, 0.0]])
 
-      assert {:error, {:invalid_query_value, 5, value}} = TurboVec.search(index, q, k: 1)
+      assert {:error, {:invalid_query_value, 5, value}} = TurboVec.search(index, query, k: 1)
       assert is_binary(value)
     end
 
@@ -208,12 +235,47 @@ defmodule TurboVecTest do
     end
 
     test "unknown and out-of-range allowlist ids error", %{index: index} do
-      q = f32_binary([basis(0)])
+      query = f32_binary([basis(0)])
 
-      assert {:error, {:unknown_id, 999}} = TurboVec.search(index, q, k: 1, allowlist: [999])
+      assert {:error, {:unknown_id, 999}} = TurboVec.search(index, query, k: 1, allowlist: [999])
 
       assert {:error, {:id_out_of_range, _}} =
-               TurboVec.search(index, q, k: 1, allowlist: [18_446_744_073_709_551_616])
+               TurboVec.search(index, query, k: 1, allowlist: [18_446_744_073_709_551_616])
+    end
+
+    @tag :nx
+    test "searches with a {dim} tensor" do
+      {:ok, index} = TurboVec.new(dim: 8)
+      tensor = Nx.eye(8, type: {:f, 32})
+      :ok = TurboVec.add(index, tensor, Enum.to_list(1..8))
+
+      {:ok, [{3, _score} | _]} = TurboVec.search(index, Nx.take(tensor, Nx.tensor(2)), k: 1)
+    end
+
+    @tag :nx
+    test "accepts a {1, dim} query as a courtesy" do
+      {:ok, index} = TurboVec.new(dim: 8)
+      :ok = TurboVec.add(index, Nx.eye(8, type: {:f, 32}), Enum.to_list(1..8))
+      query = Nx.broadcast(Nx.tensor(1.0, type: {:f, 32}), {1, 8})
+
+      assert {:ok, _} = TurboVec.search(index, query, k: 1)
+    end
+
+    @tag :nx
+    test "rejects non-f32 query tensors — byte size alone would misread f64", %{index: index} do
+      # f64 of dim/2 has exactly 4*dim bytes (spec adversarial case)
+      query = Nx.broadcast(Nx.tensor(1.0, type: {:f, 64}), {4})
+
+      assert {:error, {:invalid_tensor_type, {:f, 64}}} = TurboVec.search(index, query, k: 1)
+    end
+
+    @tag :nx
+    test "rejects wrong-rank or wrong-dim queries", %{index: index} do
+      two_row = Nx.broadcast(Nx.tensor(1.0, type: {:f, 32}), {2, 8})
+      wrong_dim = Nx.broadcast(Nx.tensor(1.0, type: {:f, 32}), {16})
+
+      assert {:error, {:invalid_tensor_shape, {2, 8}, 8}} = TurboVec.search(index, two_row, k: 1)
+      assert {:error, {:invalid_tensor_shape, {16}, 8}} = TurboVec.search(index, wrong_dim, k: 1)
     end
   end
 

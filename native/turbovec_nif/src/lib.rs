@@ -116,7 +116,7 @@ fn search(
         return Err(Error::Term(Box::new((error::atoms::invalid_k(), k))));
     }
     let allow = allowlist.map(decode_ids).transpose()?;
-    let q = f32s(&query);
+    let query_f32s = f32s(&query);
     let idx = read(&res);
     // Exactly one row: a multi-row buffer would silently flatten a batch (spec).
     let dim = idx.dim_opt().expect("index is always dim-committed");
@@ -128,7 +128,7 @@ fn search(
         ))));
     }
     let results = idx
-        .try_search_with_allowlist(&q, k, allow.as_deref())
+        .try_search_with_allowlist(&query_f32s, k, allow.as_deref())
         .map_err(error::search)?;
     Ok(results
         .ids_for_query(0)

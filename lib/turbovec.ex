@@ -11,6 +11,8 @@ defmodule TurboVec do
 
   alias TurboVec.NIF
 
+  @compile {:no_warn_undefined, {Nx, :to_binary, 1}}
+
   @u64_max (1 <<< 64) - 1
 
   @type index :: reference()
@@ -39,6 +41,12 @@ defmodule TurboVec do
   """
   @spec add(index(), vector_input(), [non_neg_integer()]) :: :ok | {:error, term()}
   def add(index, vectors, ids) when is_binary(vectors), do: NIF.add(index, vectors, ids)
+
+  def add(index, %_{} = tensor, ids) do
+    with {:ok, binary} <- tensor_binary(tensor, {:add, dim(index)}) do
+      NIF.add(index, binary, ids)
+    end
+  end
 
   def add(_index, vectors, _ids) do
     raise ArgumentError,
@@ -97,8 +105,33 @@ defmodule TurboVec do
 
   defp query_binary(query, _index) when is_binary(query), do: {:ok, query}
 
+  defp query_binary(%_{} = tensor, index), do: tensor_binary(tensor, {:query, dim(index)})
+
   defp query_binary(query, _index) do
     raise ArgumentError,
           "query must be a native-endian f32 binary or an Nx.Tensor, got: #{inspect(query)}"
   end
+
+  # Runtime dispatch: a live Nx.Tensor struct means Nx is loaded — no
+  # function_exported? probe, no conditional module (spec).
+  defp tensor_binary(tensor, shape_rule) do
+    cond do
+      not is_struct(tensor, Nx.Tensor) ->
+        raise ArgumentError, "expected a binary or Nx.Tensor, got: #{inspect(tensor)}"
+
+      tensor.type != {:f, 32} ->
+        {:error, {:invalid_tensor_type, tensor.type}}
+
+      not shape_ok?(tensor.shape, shape_rule) ->
+        {:error, {:invalid_tensor_shape, tensor.shape, elem(shape_rule, 1)}}
+
+      true ->
+        {:ok, Nx.to_binary(tensor)}
+    end
+  end
+
+  defp shape_ok?({_n, dim}, {:add, dim}), do: true
+  defp shape_ok?({dim}, {:query, dim}), do: true
+  defp shape_ok?({1, dim}, {:query, dim}), do: true
+  defp shape_ok?(_shape, _rule), do: false
 end
