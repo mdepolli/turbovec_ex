@@ -26,7 +26,7 @@ defmodule TurboVecTest do
     test "rejects dim that is zero, not a multiple of 8, or too large" do
       assert {:error, {:invalid_dim, 0}} = TurboVec.new(dim: 0)
       assert {:error, {:invalid_dim, 7}} = TurboVec.new(dim: 7)
-      assert {:error, {:dim_too_large, 16392, 16384}} = TurboVec.new(dim: 16392)
+      assert {:error, {:dim_too_large, 16_392, 16_384}} = TurboVec.new(dim: 16_392)
     end
 
     test "negative constructor integers raise" do
@@ -383,12 +383,10 @@ defmodule TurboVecTest do
 
     @tag :concurrency
     @tag timeout: 120_000
-    test "searches and a mutation complete during a long write" do
+    test "searches and a mutation complete during a long write", %{tmp_dir: dir} do
       {:ok, index} = TurboVec.new(dim: @dim, bit_width: 4)
       vectors = random_vectors(5_000, 1)
       :ok = TurboVec.add(index, f32_binary(vectors), Enum.to_list(1..5_000))
-      dir = System.tmp_dir!() |> Path.join("turbovec_conc_#{System.unique_integer([:positive])}")
-      File.mkdir_p!(dir)
       query = f32_binary([hd(vectors)])
 
       write_task = Task.async(fn -> TurboVec.write(index, Path.join(dir, "a.tvim")) end)
@@ -411,7 +409,6 @@ defmodule TurboVecTest do
       assert Enum.all?(search_results, fn {_micros, results} -> length(results) == 5 end)
       max_micros = search_results |> Enum.map(&elem(&1, 0)) |> Enum.max()
       IO.puts("max search latency during write+add: #{max_micros}µs")
-      File.rm_rf!(dir)
     end
   end
 
