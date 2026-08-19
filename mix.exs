@@ -32,7 +32,8 @@ defmodule TurboVec.MixProject do
   defp deps do
     [
       # NIF
-      {:rustler, "~> 0.36"},
+      {:rustler_precompiled, "~> 0.8"},
+      {:rustler, "~> 0.36", optional: true},
 
       # Dev/Test
       {:ex_doc, "~> 0.40", only: :dev, runtime: false},

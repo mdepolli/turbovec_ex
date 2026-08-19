@@ -1,0 +1,48 @@
+name: Release NIFs
+on:
+  push:
+    tags: ["v*"]
+jobs:
+  build:
+    name: ${{ matrix.job.target }}
+    runs-on: ${{ matrix.job.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        nif: ["2.15"]
+        job:
+          - { target: aarch64-apple-darwin, os: macos-14 }
+          # macos-13 (last x86_64 runner) is being retired; arm64 Xcode
+          # cross-compiles x86_64 natively and the action only runs
+          # `cargo build --target`.
+          - { target: x86_64-apple-darwin, os: macos-14 }
+          - { target: aarch64-unknown-linux-gnu, os: ubuntu-22.04, use-cross: true }
+          - { target: aarch64-unknown-linux-musl, os: ubuntu-22.04, use-cross: true }
+          - { target: x86_64-unknown-linux-gnu, os: ubuntu-22.04 }
+          - { target: x86_64-unknown-linux-musl, os: ubuntu-22.04, use-cross: true }
+          - { target: x86_64-pc-windows-msvc, os: windows-2022 }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.89"
+          targets: ${{ matrix.job.target }}
+      # Tag format is v0.1.0; rustler_precompiled names artifacts with the
+      # BARE Mix version (0.1.0). Passing github.ref_name verbatim ships
+      # v-prefixed artifact names and the first Hex user 404s. Strip the v:
+      - name: Extract version from tag
+        shell: bash
+        run: echo "PROJECT_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+      - name: Build the NIF
+        id: build
+        uses: philss/rustler-precompiled-action@v1
+        with:
+          project-name: turbovec_nif
+          project-version: ${{ env.PROJECT_VERSION }}
+          target: ${{ matrix.job.target }}
+          nif-version: ${{ matrix.nif }}
+          use-cross: ${{ matrix.job.use-cross || false }}
+          project-dir: "native/turbovec_nif"
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.build.outputs.file-name }}

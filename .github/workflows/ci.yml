@@ -1,0 +1,39 @@
+name: CI
+# Known gap, accepted: Windows is in the release matrix but not CI.
+on: [push, pull_request]
+env:
+  TURBOVEC_EX_BUILD: "1"
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: erlef/setup-beam@v1 # has macOS builds; do not brew-install
+        with: { otp-version: "28", elixir-version: "1.20" }
+      # @stable + toolchain input is the action's guaranteed spelling;
+      # a bare @1.89 ref may not exist as a tag. Same pin as rust-toolchain.toml.
+      - uses: dtolnay/rust-toolchain@stable
+        with: { toolchain: "1.89" }
+      - run: mix deps.get
+      - run: mix compile --warnings-as-errors
+      - run: mix format --check-formatted
+      - run: mix test
+      - run: cargo test --manifest-path native/turbovec_nif/Cargo.toml
+  no-nx:
+    runs-on: ubuntu-latest
+    env:
+      NO_NX: "1"
+      TURBOVEC_EX_BUILD: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: erlef/setup-beam@v1
+        with: { otp-version: "28", elixir-version: "1.20" }
+      - uses: dtolnay/rust-toolchain@stable
+        with: { toolchain: "1.89" }
+      - run: mix deps.get
+      # The spec's Nx tripwire: must COMPILE (not merely skip) without Nx
+      - run: mix compile --warnings-as-errors --force
+      - run: mix test --exclude nx
