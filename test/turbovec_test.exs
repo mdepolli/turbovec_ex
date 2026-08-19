@@ -60,6 +60,13 @@ defmodule TurboVecTest do
 
       assert {:error, {:vector_byte_size_mismatch, 33}} = TurboVec.add(index, bin, [1])
     end
+
+    test "rejects ids/vectors count mismatch" do
+      {:ok, index} = TurboVec.new(dim: 8, bit_width: 4)
+      bin = f32_binary([List.duplicate(1.0, 8)])
+
+      assert {:error, {:ids_count_mismatch, 1, 2}} = TurboVec.add(index, bin, [1, 2])
+    end
   end
 
   describe "count/1" do
