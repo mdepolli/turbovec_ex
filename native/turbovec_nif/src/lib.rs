@@ -1,4 +1,5 @@
 mod error;
+mod pool;
 
 use rustler::{Binary, Error, NifResult, Resource, ResourceArc, Term};
 use std::borrow::Cow;
@@ -90,15 +91,20 @@ fn add(
     }
     let ids = decode_ids(ids)?;
     let vecs = f32s(&vectors);
-    let mut idx = write(&res);
-    idx.add_with_ids(&vecs, &ids).map_err(error::add)?;
+    let mut guard = write(&res);
+    let idx: &mut IdMapIndex = &mut *guard;
+    pool::get()
+        .install(|| idx.add_with_ids(&vecs, &ids))
+        .map_err(error::add)?;
     Ok(error::atoms::ok())
 }
 
 #[rustler::nif(schedule = "DirtyCpu")]
 fn remove(res: ResourceArc<IndexResource>, id: Term) -> NifResult<rustler::Atom> {
     let id = decode_ids(vec![id])?[0];
-    if write(&res).remove(id) {
+    let mut guard = write(&res);
+    let idx: &mut IdMapIndex = &mut *guard;
+    if pool::get().install(|| idx.remove(id)) {
         Ok(error::atoms::ok())
     } else {
         Err(Error::Term(Box::new(error::atoms::not_found())))
@@ -127,8 +133,8 @@ fn search(
             query.len(),
         ))));
     }
-    let results = idx
-        .try_search_with_allowlist(&query_f32s, k, allow.as_deref())
+    let results = pool::get()
+        .install(|| idx.try_search_with_allowlist(&query_f32s, k, allow.as_deref()))
         .map_err(error::search)?;
     Ok(results
         .ids_for_query(0)
@@ -140,29 +146,43 @@ fn search(
 
 #[rustler::nif(schedule = "DirtyCpu")]
 fn contains(res: ResourceArc<IndexResource>, id: u64) -> bool {
-    read(&res).contains(id)
+    let idx = read(&res);
+    pool::get().install(|| idx.contains(id))
 }
 
 #[rustler::nif(schedule = "DirtyIo")]
 fn write_index(res: ResourceArc<IndexResource>, path: String) -> NifResult<rustler::Atom> {
-    read(&res).write(&path).map_err(error::io)?;
+    let idx = read(&res);
+    pool::get()
+        .install(|| idx.write(&path))
+        .map_err(error::io)?;
     Ok(error::atoms::ok())
 }
 
 #[rustler::nif(schedule = "DirtyIo")]
 fn sync(res: ResourceArc<IndexResource>, path: String) -> NifResult<rustler::Atom> {
-    write(&res).sync(&path).map_err(error::io)?;
+    let mut guard = write(&res);
+    let idx: &mut IdMapIndex = &mut *guard;
+    pool::get().install(|| idx.sync(&path)).map_err(error::io)?;
     Ok(error::atoms::ok())
 }
 
 #[rustler::nif(schedule = "DirtyIo")]
 fn load(path: String) -> NifResult<ResourceArc<IndexResource>> {
-    let idx = IdMapIndex::load(&path).map_err(error::io)?;
+    let idx = pool::get()
+        .install(|| IdMapIndex::load(&path))
+        .map_err(error::io)?;
     if idx.dim_opt().is_none() {
         // Spec: reject lazy loads so add_with_ids' documented panic is unreachable
         return Err(Error::Term(Box::new(error::atoms::uncommitted_dim())));
     }
     Ok(ResourceArc::new(IndexResource(RwLock::new(idx))))
+}
+
+#[rustler::nif]
+fn init_pool(n: usize) -> rustler::Atom {
+    pool::init(n);
+    error::atoms::ok()
 }
 
 rustler::init!("Elixir.TurboVec.NIF");

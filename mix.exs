@@ -25,7 +25,8 @@ defmodule TurboVec.MixProject do
 
   def application do
     [
-      extra_applications: [:logger]
+      extra_applications: [:logger],
+      mod: {TurboVec.Application, []}
     ]
   end
 

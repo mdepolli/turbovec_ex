@@ -2,6 +2,7 @@ defmodule TurboVec.NIF do
   @moduledoc false
   use Rustler, otp_app: :turbovec_ex, crate: "turbovec_nif"
 
+  def init_pool(_n), do: err()
   def new(_dim, _bit_width), do: err()
   def load(_path), do: err()
   def add(_index, _vectors, _ids), do: err()
