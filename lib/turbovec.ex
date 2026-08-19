@@ -2,6 +2,15 @@ defmodule TurboVec do
   @moduledoc """
   In-process vector search over the turbovec Rust crate (`IdMapIndex`).
 
+      {:ok, index} = TurboVec.new(dim: 1536, bit_width: 4)
+      :ok = TurboVec.add(index, vectors, ids)
+      {:ok, results} = TurboVec.search(index, query, k: 10, allowlist: tenant_ids)
+      :ok = TurboVec.write(index, "index.tvim")
+
+  `results` is `[{id, score}, ...]`, length `<= k`, best first. Vectors
+  and queries are a native-endian f32 binary, or an `Nx.Tensor` of type
+  `{:f, 32}`.
+
   The index handle is a node-local NIF resource: it cannot cross nodes,
   survive `:erlang.term_to_binary/1`, or live in ETS across restarts.
   Move an index between nodes or lifetimes with `write/2` and `load/1`.
