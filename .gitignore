@@ -5,6 +5,9 @@
 # and rustler_precompiled checksums need a pinned crate graph.
 /native/turbovec_nif/target/
 
+# Compiled NIF artifact copied here by rustler (rebuild from source).
+/priv/native/
+
 # If you run "mix test --cover", coverage assets end up here.
 /cover/
 
