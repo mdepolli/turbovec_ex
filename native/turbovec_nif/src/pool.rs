@@ -1,7 +1,6 @@
 use std::sync::OnceLock;
 
 static POOL: OnceLock<rayon::ThreadPool> = OnceLock::new();
-static DEFAULT_INPUT: OnceLock<usize> = OnceLock::new();
 
 // TURBOVEC_NUM_THREADS > RAYON_NUM_THREADS > max(1, n/2)  (spec)
 // Outer max: rayon treats num_threads(0) as "auto = all cores" — a user
@@ -21,19 +20,11 @@ fn env_usize(name: &str) -> Option<usize> {
     std::env::var(name).ok().and_then(|v| v.parse().ok())
 }
 
-/// Records the dirty-CPU-scheduler count from Application.start/2.
-/// Feeds only tier 3 — env vars always win (spec).
-pub fn init(n: usize) {
-    let _ = DEFAULT_INPUT.set(n);
-}
-
 pub fn get() -> &'static rayon::ThreadPool {
     POOL.get_or_init(|| {
-        let fallback = DEFAULT_INPUT.get().copied().unwrap_or_else(|| {
-            std::thread::available_parallelism()
-                .map(|n| n.get())
-                .unwrap_or(2)
-        });
+        let fallback = std::thread::available_parallelism()
+            .map(|n| n.get())
+            .unwrap_or(2);
         let size = pool_size(
             env_usize("TURBOVEC_NUM_THREADS"),
             env_usize("RAYON_NUM_THREADS"),

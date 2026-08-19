@@ -179,10 +179,4 @@ fn load(path: String) -> NifResult<ResourceArc<IndexResource>> {
     Ok(ResourceArc::new(IndexResource(RwLock::new(idx))))
 }
 
-#[rustler::nif]
-fn init_pool(n: usize) -> rustler::Atom {
-    pool::init(n);
-    error::atoms::ok()
-}
-
 rustler::init!("Elixir.TurboVec.NIF");
