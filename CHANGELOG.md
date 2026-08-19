@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-08-19
+
 ### Added
 
 - In-process `IdMapIndex` binding: `new/1`, `add/3`, `remove/2`,
@@ -19,3 +21,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `TURBOVEC_EX_BUILD=1` to compile from source (Rust ≥ 1.89, 64-bit).
 - Dedicated rayon pool sized by `TURBOVEC_NUM_THREADS`, then
   `RAYON_NUM_THREADS`, then `max(1, available_parallelism / 2)`.
+
+[Unreleased]: https://github.com/mdepolli/turbovec_ex/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/mdepolli/turbovec_ex/releases/tag/v0.1.0
