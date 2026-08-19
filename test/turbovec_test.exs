@@ -122,6 +122,62 @@ defmodule TurboVecTest do
     end
   end
 
+  describe "search/3" do
+    setup do
+      {:ok, index} = TurboVec.new(dim: 8, bit_width: 4)
+      :ok = TurboVec.add(index, f32_binary(Enum.map(0..3, &basis/1)), [100, 101, 102, 103])
+      %{index: index}
+    end
+
+    test "a stored vector's nearest neighbor is itself", %{index: index} do
+      {:ok, results} = TurboVec.search(index, f32_binary([basis(2)]), k: 1)
+
+      assert [{102, score}] = results
+      assert is_float(score)
+    end
+
+    test "results are sorted best-first and length <= k", %{index: index} do
+      # k beyond count clamps (spec: min(k, count, allowlist))
+      {:ok, results} = TurboVec.search(index, f32_binary([basis(0)]), k: 10)
+
+      assert length(results) == 4
+      scores = Enum.map(results, &elem(&1, 1))
+      assert scores == Enum.sort(scores, :desc)
+    end
+
+    test "empty index returns an empty list" do
+      {:ok, empty} = TurboVec.new(dim: 8)
+
+      assert {:ok, []} = TurboVec.search(empty, f32_binary([basis(0)]), k: 10)
+    end
+
+    test "k = 0 is rejected, not clamped", %{index: index} do
+      assert {:error, {:invalid_k, 0}} = TurboVec.search(index, f32_binary([basis(0)]), k: 0)
+    end
+
+    test "a query that is not exactly one row is rejected", %{index: index} do
+      # two rows would be a silent flattened batch (spec)
+      two = f32_binary([basis(0), basis(1)])
+
+      assert {:error, {:query_size_mismatch, 32, 64}} = TurboVec.search(index, two, k: 1)
+      short = f32_binary([[1.0, 2.0]])
+      assert {:error, {:query_size_mismatch, 32, 8}} = TurboVec.search(index, short, k: 1)
+    end
+
+    test "non-finite query coordinates are rejected", %{index: index} do
+      # NaN at coord 5
+      q =
+        f32_binary([[1.0, 0.0, 0.0, 0.0, 0.0]]) <> <<0, 0, 192, 127>> <> f32_binary([[0.0, 0.0]])
+
+      assert {:error, {:invalid_query_value, 5, value}} = TurboVec.search(index, q, k: 1)
+      assert is_binary(value)
+    end
+
+    test "raises ArgumentError for a query that is neither binary nor tensor", %{index: index} do
+      assert_raise ArgumentError, fn -> TurboVec.search(index, [1.0, 2.0], k: 1) end
+    end
+  end
+
   describe "count/1" do
     test "starts at zero" do
       {:ok, index} = TurboVec.new(dim: 8, bit_width: 4)
@@ -141,5 +197,6 @@ defmodule TurboVecTest do
   defp f32_binary(rows) do
     for row <- rows, x <- row, into: <<>>, do: <<x::float-32-native>>
   end
-end
 
+  defp basis(i), do: for(j <- 0..7, do: if(j == i, do: 1.0, else: 0.0))
+end

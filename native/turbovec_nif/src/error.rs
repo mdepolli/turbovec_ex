@@ -1,5 +1,5 @@
 use rustler::Error;
-use turbovec::{AddError, ConstructError};
+use turbovec::{AddError, ConstructError, SearchError};
 
 pub mod atoms {
     rustler::atoms! {
@@ -15,6 +15,13 @@ pub mod atoms {
         duplicate_id_in_batch,
         invalid_input_value,
         id_out_of_range,
+        allowlist_empty,
+        unknown_id,
+        invalid_query_value,
+        invalid_k,
+        query_size_mismatch,
+        not_found,
+        uncommitted_dim,
         turbovec_error,
     }
 }
@@ -64,6 +71,22 @@ pub fn add(e: AddError) -> Error {
         } => Error::Term(Box::new((
             atoms::invalid_input_value(),
             vector_index,
+            coord_index,
+            value.to_string(),
+        ))),
+        other => Error::Term(Box::new((atoms::turbovec_error(), other.to_string()))),
+    }
+}
+
+pub fn search(e: SearchError) -> Error {
+    match e {
+        SearchError::AllowlistEmpty => Error::Term(Box::new(atoms::allowlist_empty())),
+        SearchError::UnknownId(id) => Error::Term(Box::new((atoms::unknown_id(), id))),
+        // query_index dropped: always 0 in the single-query API (spec)
+        SearchError::InvalidQueryValue {
+            coord_index, value, ..
+        } => Error::Term(Box::new((
+            atoms::invalid_query_value(),
             coord_index,
             value.to_string(),
         ))),

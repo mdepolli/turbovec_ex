@@ -41,6 +41,26 @@ defmodule TurboVec do
           "vectors must be a native-endian f32 binary or an Nx.Tensor, got: #{inspect(vectors)}"
   end
 
+  @doc """
+  Top-k search. Returns up to `k` results — `k` is clamped to the index
+  (and allowlist) size, so `length(results) <= k`; an empty index returns
+  `{:ok, []}`. Scores are length-renormalized inner product, equal to
+  cosine only for L2-normalized vectors.
+  """
+  @spec search(index(), vector_input(), keyword()) ::
+          {:ok, [{non_neg_integer(), float()}]} | {:error, term()}
+  def search(index, query, opts) do
+    k = Keyword.fetch!(opts, :k)
+    allowlist = Keyword.get(opts, :allowlist)
+
+    with {:ok, binary} <- query_binary(query, index) do
+      case NIF.search(index, binary, k, allowlist) do
+        {:error, _} = error -> error
+        results -> {:ok, results}
+      end
+    end
+  end
+
   @doc "Number of vectors in the index. Infallible."
   @spec count(index()) :: non_neg_integer()
   def count(index), do: NIF.count(index)
@@ -52,4 +72,11 @@ defmodule TurboVec do
   @doc "Bits per coordinate (2, 3, or 4). Infallible."
   @spec bit_width(index()) :: 2 | 3 | 4
   def bit_width(index), do: NIF.bit_width(index)
+
+  defp query_binary(query, _index) when is_binary(query), do: {:ok, query}
+
+  defp query_binary(query, _index) do
+    raise ArgumentError,
+          "query must be a native-endian f32 binary or an Nx.Tensor, got: #{inspect(query)}"
+  end
 end
