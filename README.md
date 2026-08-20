@@ -30,7 +30,7 @@ Add `turbovec_ex` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:turbovec_ex, "~> 0.1.0"}
+    {:turbovec_ex, "~> 0.2.0"}
   ]
 end
 ```

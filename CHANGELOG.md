@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-19
+
 ### Added
 
 - `new!/1` and `load!/1`, raising `TurboVec.Error` with the same `reason`
@@ -33,5 +35,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `RAYON_NUM_THREADS`, then `max(1, available_parallelism / 2)`.
 - Elixir `~> 1.17` (Nx's floor; CI covers 1.17–1.20).
 
-[Unreleased]: https://github.com/mdepolli/turbovec_ex/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/mdepolli/turbovec_ex/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/mdepolli/turbovec_ex/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/mdepolli/turbovec_ex/releases/tag/v0.1.0
