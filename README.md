@@ -44,20 +44,21 @@ Docs: <https://hexdocs.pm/turbovec_ex>.
 ## API
 
 ```elixir
-{:ok, idx} = TurboVec.new(dim: 1536, bit_width: 4)
-:ok = TurboVec.add(idx, vectors, ids)
-{:ok, results} = TurboVec.search(idx, query, k: 10, allowlist: tenant_ids)
+{:ok, results} =
+  TurboVec.new!(dim: 1536, bit_width: 4)
+  |> TurboVec.add(vectors, ids)
+  |> TurboVec.search(query, k: 10, allowlist: tenant_ids)
+
 # results: [{id, score}, ...]  — length <= k, best first
-:ok = TurboVec.remove(idx, id)
+index = TurboVec.load!("/var/data/myapp/index.tvim")
+TurboVec.remove(index, id)
+TurboVec.write(index, "/var/data/myapp/index.tvim")
+TurboVec.sync(index, "/var/data/myapp/index.tvim")
 
-count = TurboVec.count(idx)
-dim = TurboVec.dim(idx)
-bit_width = TurboVec.bit_width(idx)
-true = TurboVec.contains?(idx, id)
-
-:ok = TurboVec.write(idx, "/var/data/myapp/index.tvim")
-{:ok, idx} = TurboVec.load("/var/data/myapp/index.tvim")
-:ok = TurboVec.sync(idx, "/var/data/myapp/index.tvim")
+count = TurboVec.count(index)
+dim = TurboVec.dim(index)
+bit_width = TurboVec.bit_width(index)
+true = TurboVec.contains?(index, id)
 ```
 
 `bit_width` is `2`, `3`, or `4`. Default **4**. Two-bit is smaller and faster

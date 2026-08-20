@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `new!/1` and `load!/1`, raising `TurboVec.Error` with the same `reason`
+  the non-bang functions return.
+
+### Changed
+
+- `add/3`, `remove/2`, `write/2`, and `sync/2` return the index handle
+  on success so they can be piped.
+
 ## [0.1.0] - 2026-08-19
 
 ### Added

@@ -38,6 +38,24 @@ defmodule TurboVecTest do
     end
   end
 
+  describe "new!/1" do
+    test "returns a handle that pipes into add/3 and search/3" do
+      vectors = f32_binary([List.duplicate(1.0, 8)])
+      query = f32_binary([List.duplicate(1.0, 8)])
+
+      assert {:ok, [{1, _score}]} =
+               TurboVec.new!(dim: 8)
+               |> TurboVec.add(vectors, [1])
+               |> TurboVec.search(query, k: 1)
+    end
+
+    test "raises TurboVec.Error with the same reason new/1 would return" do
+      error = assert_raise TurboVec.Error, fn -> TurboVec.new!(dim: 0) end
+
+      assert error.reason == {:invalid_dim, 0}
+    end
+  end
+
   describe "add/3" do
     setup do
       {:ok, index} = TurboVec.new(dim: 8, bit_width: 4)
@@ -48,7 +66,7 @@ defmodule TurboVecTest do
       {:ok, index} = TurboVec.new(dim: 8, bit_width: 4)
       vectors = f32_binary([[1, 0, 0, 0, 0, 0, 0, 0], [0, 1, 0, 0, 0, 0, 0, 0]])
 
-      assert :ok = TurboVec.add(index, vectors, [10, 20])
+      assert ^index = TurboVec.add(index, vectors, [10, 20])
       assert TurboVec.count(index) == 2
     end
 
@@ -79,7 +97,7 @@ defmodule TurboVecTest do
     test "rejects an id already present and a duplicate in batch" do
       {:ok, index} = TurboVec.new(dim: 8, bit_width: 4)
       row = f32_binary([List.duplicate(1.0, 8)])
-      :ok = TurboVec.add(index, row, [7])
+      TurboVec.add(index, row, [7])
 
       # error atomicity: the failed batch adds nothing
       assert {:error, {:id_already_present, 7}} = TurboVec.add(index, row, [7])
@@ -131,7 +149,7 @@ defmodule TurboVecTest do
     test "adds an {n, dim} f32 tensor", %{index: index} do
       tensor = Nx.eye(8, type: {:f, 32})
 
-      assert :ok = TurboVec.add(index, tensor, Enum.to_list(1..8))
+      assert ^index = TurboVec.add(index, tensor, Enum.to_list(1..8))
       assert TurboVec.count(index) == 8
     end
 
@@ -153,12 +171,12 @@ defmodule TurboVecTest do
   describe "remove/2" do
     setup do
       {:ok, index} = TurboVec.new(dim: 8)
-      :ok = TurboVec.add(index, f32_binary([List.duplicate(1.0, 8)]), [42])
+      TurboVec.add(index, f32_binary([List.duplicate(1.0, 8)]), [42])
       %{index: index}
     end
 
     test "removes present ids and reports absent ones", %{index: index} do
-      assert :ok = TurboVec.remove(index, 42)
+      assert ^index = TurboVec.remove(index, 42)
       assert TurboVec.count(index) == 0
       assert {:error, :not_found} = TurboVec.remove(index, 42)
       assert {:error, {:id_out_of_range, _}} = TurboVec.remove(index, @u64_max + 1)
@@ -168,7 +186,7 @@ defmodule TurboVecTest do
   describe "search/3" do
     setup do
       {:ok, index} = TurboVec.new(dim: 8, bit_width: 4)
-      :ok = TurboVec.add(index, f32_binary(Enum.map(0..3, &basis/1)), [100, 101, 102, 103])
+      TurboVec.add(index, f32_binary(Enum.map(0..3, &basis/1)), [100, 101, 102, 103])
       %{index: index}
     end
 
@@ -248,7 +266,7 @@ defmodule TurboVecTest do
     test "searches with a {dim} tensor" do
       {:ok, index} = TurboVec.new(dim: 8)
       tensor = Nx.eye(8, type: {:f, 32})
-      :ok = TurboVec.add(index, tensor, Enum.to_list(1..8))
+      TurboVec.add(index, tensor, Enum.to_list(1..8))
 
       {:ok, [{3, _score} | _]} = TurboVec.search(index, Nx.take(tensor, Nx.tensor(2)), k: 1)
     end
@@ -256,7 +274,7 @@ defmodule TurboVecTest do
     @tag :nx
     test "accepts a {1, dim} query as a courtesy" do
       {:ok, index} = TurboVec.new(dim: 8)
-      :ok = TurboVec.add(index, Nx.eye(8, type: {:f, 32}), Enum.to_list(1..8))
+      TurboVec.add(index, Nx.eye(8, type: {:f, 32}), Enum.to_list(1..8))
       query = Nx.broadcast(Nx.tensor(1.0, type: {:f, 32}), {1, 8})
 
       assert {:ok, _} = TurboVec.search(index, query, k: 1)
@@ -283,7 +301,7 @@ defmodule TurboVecTest do
     test "quantized top-10 overlaps exact inner-product top-10" do
       vectors = random_vectors(300, 42)
       {:ok, index} = TurboVec.new(dim: @dim, bit_width: 4)
-      :ok = TurboVec.add(index, f32_binary(vectors), Enum.to_list(1..300))
+      TurboVec.add(index, f32_binary(vectors), Enum.to_list(1..300))
       queries = random_vectors(20, 7)
 
       recalls =
@@ -309,7 +327,7 @@ defmodule TurboVecTest do
     test "runs on turbovec-* threads, never the global rayon pool" do
       if File.dir?("/proc/self/task") do
         {:ok, index} = TurboVec.new(dim: @dim)
-        :ok = TurboVec.add(index, f32_binary(random_vectors(100, 3)), Enum.to_list(1..100))
+        TurboVec.add(index, f32_binary(random_vectors(100, 3)), Enum.to_list(1..100))
         {:ok, _} = TurboVec.search(index, f32_binary(random_vectors(1, 4)), k: 5)
 
         names =
@@ -327,7 +345,7 @@ defmodule TurboVecTest do
   describe "contains?/2" do
     setup do
       {:ok, index} = TurboVec.new(dim: 8)
-      :ok = TurboVec.add(index, f32_binary([List.duplicate(1.0, 8)]), [42])
+      TurboVec.add(index, f32_binary([List.duplicate(1.0, 8)]), [42])
       %{index: index}
     end
 
@@ -361,7 +379,7 @@ defmodule TurboVecTest do
 
     test "round-trip with load/1 preserves geometry and content", %{tmp_dir: dir} do
       path = Path.join(dir, "index.tvim")
-      :ok = TurboVec.write(filled(), path)
+      TurboVec.write(filled(), path)
       {:ok, loaded} = TurboVec.load(path)
 
       assert TurboVec.count(loaded) == 1
@@ -375,10 +393,10 @@ defmodule TurboVecTest do
       # so sync -> write -> sync rebuilds instead of getting stuck.
       path = Path.join(dir, "bound.tvim")
       index = filled()
-      :ok = TurboVec.sync(index, path)
-      :ok = TurboVec.write(index, path)
+      TurboVec.sync(index, path)
+      TurboVec.write(index, path)
 
-      assert :ok = TurboVec.sync(index, path)
+      assert ^index = TurboVec.sync(index, path)
     end
 
     @tag :concurrency
@@ -386,7 +404,7 @@ defmodule TurboVecTest do
     test "searches and a mutation complete during a long write", %{tmp_dir: dir} do
       {:ok, index} = TurboVec.new(dim: @dim, bit_width: 4)
       vectors = random_vectors(5_000, 1)
-      :ok = TurboVec.add(index, f32_binary(vectors), Enum.to_list(1..5_000))
+      TurboVec.add(index, f32_binary(vectors), Enum.to_list(1..5_000))
       query = f32_binary([hd(vectors)])
 
       write_task = Task.async(fn -> TurboVec.write(index, Path.join(dir, "a.tvim")) end)
@@ -404,8 +422,8 @@ defmodule TurboVecTest do
 
       # everything completes and stays correct; latency is reported, not
       # asserted (CI timing is not a contract)
-      assert :ok = Task.await(write_task, 60_000)
-      assert :ok = Task.await(add_task, 60_000)
+      assert ^index = Task.await(write_task, 60_000)
+      assert ^index = Task.await(add_task, 60_000)
       assert Enum.all?(search_results, fn {_micros, results} -> length(results) == 5 end)
       max_micros = search_results |> Enum.map(&elem(&1, 0)) |> Enum.max()
       IO.puts("max search latency during write+add: #{max_micros}µs")
@@ -418,9 +436,9 @@ defmodule TurboVecTest do
     test "is incremental across calls", %{tmp_dir: dir} do
       path = Path.join(dir, "inc.tvim")
       index = filled()
-      :ok = TurboVec.sync(index, path)
-      :ok = TurboVec.add(index, f32_binary([List.duplicate(2.0, 8)]), [43])
-      :ok = TurboVec.sync(index, path)
+      TurboVec.sync(index, path)
+      TurboVec.add(index, f32_binary([List.duplicate(2.0, 8)]), [43])
+      TurboVec.sync(index, path)
       {:ok, loaded} = TurboVec.load(path)
 
       assert TurboVec.count(loaded) == 2
@@ -428,11 +446,11 @@ defmodule TurboVecTest do
 
     test "a second live handle notices a foreign incremental sync", %{tmp_dir: dir} do
       path = Path.join(dir, "shared.tvim")
-      :ok = TurboVec.sync(filled(), path)
+      TurboVec.sync(filled(), path)
       {:ok, first} = TurboVec.load(path)
       {:ok, second} = TurboVec.load(path)
-      :ok = TurboVec.add(first, f32_binary([List.duplicate(2.0, 8)]), [43])
-      :ok = TurboVec.sync(first, path)
+      TurboVec.add(first, f32_binary([List.duplicate(2.0, 8)]), [43])
+      TurboVec.sync(first, path)
 
       assert {:error, {:io_error, :invalid_data, _msg}} = TurboVec.sync(second, path)
     end
@@ -444,7 +462,7 @@ defmodule TurboVecTest do
     test "reads a sync container too", %{tmp_dir: dir} do
       # first sync to a fresh path is a full write (spec)
       path = Path.join(dir, "synced.tvim")
-      :ok = TurboVec.sync(filled(), path)
+      TurboVec.sync(filled(), path)
 
       assert {:ok, loaded} = TurboVec.load(path)
       assert TurboVec.count(loaded) == 1
@@ -463,10 +481,29 @@ defmodule TurboVecTest do
     end
   end
 
+  describe "load!/1" do
+    @describetag :tmp_dir
+
+    test "returns a handle", %{tmp_dir: dir} do
+      path = Path.join(dir, "index.tvim")
+      TurboVec.write(filled(), path)
+
+      assert is_reference(TurboVec.load!(path))
+    end
+
+    test "raises TurboVec.Error with the same reason load/1 would return" do
+      error =
+        assert_raise TurboVec.Error, fn ->
+          TurboVec.load!("test/fixtures/lazy.tvim")
+        end
+
+      assert error.reason == :uncommitted_dim
+    end
+  end
+
   defp filled do
-    {:ok, index} = TurboVec.new(dim: 8)
-    :ok = TurboVec.add(index, f32_binary([List.duplicate(1.0, 8)]), [42])
-    index
+    TurboVec.new!(dim: 8)
+    |> TurboVec.add(f32_binary([List.duplicate(1.0, 8)]), [42])
   end
 
   defp f32_binary(rows) do

@@ -2,10 +2,10 @@ defmodule TurboVec do
   @moduledoc """
   In-process vector search over the turbovec Rust crate (`IdMapIndex`).
 
-      {:ok, index} = TurboVec.new(dim: 1536, bit_width: 4)
-      :ok = TurboVec.add(index, vectors, ids)
-      {:ok, results} = TurboVec.search(index, query, k: 10, allowlist: tenant_ids)
-      :ok = TurboVec.write(index, "index.tvim")
+      {:ok, results} =
+        TurboVec.new!(dim: 1536, bit_width: 4)
+        |> TurboVec.add(vectors, ids)
+        |> TurboVec.search(query, k: 10, allowlist: tenant_ids)
 
   `results` is `[{id, score}, ...]`, length `<= k`, best first. Vectors
   and queries are a native-endian f32 binary, or an `Nx.Tensor` of type
@@ -24,7 +24,7 @@ defmodule TurboVec do
 
   import Bitwise
 
-  alias TurboVec.NIF
+  alias TurboVec.{Error, NIF}
 
   @compile {:no_warn_undefined, {Nx, :to_binary, 1}}
 
@@ -50,6 +50,15 @@ defmodule TurboVec do
     end
   end
 
+  @doc "Same as `new/1`, but returns the handle or raises `TurboVec.Error`."
+  @spec new!(keyword()) :: index()
+  def new!(opts) do
+    case new(opts) do
+      {:ok, index} -> index
+      {:error, reason} -> raise Error, reason: reason
+    end
+  end
+
   @doc """
   Loads a `write/2` snapshot or a `sync/2` container. Corruption and
   foreign-writer conflicts both surface as `{:io_error, :invalid_data, msg}`
@@ -63,16 +72,31 @@ defmodule TurboVec do
     end
   end
 
+  @doc "Same as `load/1`, but returns the handle or raises `TurboVec.Error`."
+  @spec load!(Path.t()) :: index()
+  def load!(path) do
+    case load(path) do
+      {:ok, index} -> index
+      {:error, reason} -> raise Error, reason: reason
+    end
+  end
+
   @doc """
-  Adds vectors with stable u64 ids. Error atomicity: a rejected batch
-  leaves the index exactly as it was — no cleanup needed.
+  Adds vectors with stable u64 ids. Returns the handle so it can be
+  piped. Error atomicity: a rejected batch leaves the index exactly as
+  it was — no cleanup needed.
   """
-  @spec add(index(), vector_input(), [non_neg_integer()]) :: :ok | {:error, term()}
-  def add(index, vectors, ids) when is_binary(vectors), do: NIF.add(index, vectors, ids)
+  @spec add(index(), vector_input(), [non_neg_integer()]) :: index() | {:error, term()}
+  def add(index, vectors, ids) when is_binary(vectors) do
+    case NIF.add(index, vectors, ids) do
+      :ok -> index
+      {:error, _} = error -> error
+    end
+  end
 
   def add(index, %_{} = tensor, ids) do
     with {:ok, binary} <- tensor_binary(tensor, {:add, dim(index)}) do
-      NIF.add(index, binary, ids)
+      add(index, binary, ids)
     end
   end
 
@@ -81,9 +105,14 @@ defmodule TurboVec do
           "vectors must be a native-endian f32 binary or an Nx.Tensor, got: #{inspect(vectors)}"
   end
 
-  @doc "Removes one id. `{:error, :not_found}` if absent."
-  @spec remove(index(), non_neg_integer()) :: :ok | {:error, term()}
-  def remove(index, id), do: NIF.remove(index, id)
+  @doc "Removes one id. Returns the handle. `{:error, :not_found}` if absent."
+  @spec remove(index(), non_neg_integer()) :: index() | {:error, term()}
+  def remove(index, id) do
+    case NIF.remove(index, id) do
+      :ok -> index
+      {:error, _} = error -> error
+    end
+  end
 
   @doc """
   Top-k search. Returns up to `k` results — `k` is clamped to the index
@@ -132,28 +161,40 @@ defmodule TurboVec do
   def bit_width(index), do: NIF.bit_width(index)
 
   @doc """
-  Full durable snapshot (atomic replace). Do not `write/2` to a path
-  another handle is incrementally syncing. `write` then `sync` on the
-  same handle rebuilds (the snapshot is unclaimed, not foreign). Two
-  handles incrementally syncing one path is not supported — the lagging
-  handle fails at its next `sync`.
+  Full durable snapshot (atomic replace). Returns the handle.
+
+  Do not `write/2` to a path another handle is incrementally syncing.
+  `write` then `sync` on the same handle rebuilds (the snapshot is
+  unclaimed, not foreign). Two handles incrementally syncing one path
+  is not supported — the lagging handle fails at its next `sync`.
   Holding the read lock: mutations queue for the duration, and once one
   queues, new searches may block behind it (no RwLock fairness is
   guaranteed). Prefer `sync/2` for routine durability; call `write/2`
   in quiet periods.
   """
-  @spec write(index(), Path.t()) :: :ok | {:error, term()}
-  def write(index, path), do: NIF.write_index(index, IO.chardata_to_string(path))
+  @spec write(index(), Path.t()) :: index() | {:error, term()}
+  def write(index, path) do
+    case NIF.write_index(index, IO.chardata_to_string(path)) do
+      :ok -> index
+      {:error, _} = error -> error
+    end
+  end
 
   @doc """
-  Durable incremental save. First call to a fresh path writes the whole
-  file; the index stays bound to the path. One writer per path — a
-  concurrent writer is detected at the *next* sync, not locked out.
-  Holds the write lock for the disk IO: searches and mutations queue
-  until it returns.
+  Durable incremental save. Returns the handle.
+
+  First call to a fresh path writes the whole file; the index stays
+  bound to the path. One writer per path — a concurrent writer is
+  detected at the *next* sync, not locked out. Holds the write lock
+  for the disk IO: searches and mutations queue until it returns.
   """
-  @spec sync(index(), Path.t()) :: :ok | {:error, term()}
-  def sync(index, path), do: NIF.sync(index, IO.chardata_to_string(path))
+  @spec sync(index(), Path.t()) :: index() | {:error, term()}
+  def sync(index, path) do
+    case NIF.sync(index, IO.chardata_to_string(path)) do
+      :ok -> index
+      {:error, _} = error -> error
+    end
+  end
 
   defp query_binary(query, _index) when is_binary(query), do: {:ok, query}
 
