@@ -1,5 +1,9 @@
 # TurboVec
 
+[![Hex.pm](https://img.shields.io/hexpm/v/turbovec_ex)](https://hex.pm/packages/turbovec_ex)
+[![Documentation](https://img.shields.io/badge/docs-hexdocs-blue)](https://hexdocs.pm/turbovec_ex)
+[![CI](https://github.com/mdepolli/turbovec_ex/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/mdepolli/turbovec_ex/actions/workflows/ci.yml)
+
 Elixir bindings for [turbovec](https://github.com/RyanCodrai/turbovec): in-process
 vector search with TurboQuant compression. No training pass, no sidecar, no
 graph to rebuild.
@@ -38,8 +42,6 @@ end
 The NIF is precompiled — no Rust toolchain needed. To compile from
 source, set `TURBOVEC_EX_BUILD=1` (requires Rust ≥ 1.89). 64-bit hosts
 only.
-
-Docs: <https://hexdocs.pm/turbovec_ex>.
 
 ## API
 
